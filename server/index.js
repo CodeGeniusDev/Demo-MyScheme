@@ -93,18 +93,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Database connection
-mongoose.connect(MONGODB_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => {
-  logger.info('Connected to MongoDB');
-})
-.catch((error) => {
-  logger.error('MongoDB connection error:', error);
-  process.exit(1);
-});
+// Database connection with graceful fallback
+let dbConnected = false;
+
+async function connectToDatabase() {
+  try {
+    await mongoose.connect(MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      connectTimeoutMS: 10000, // Give up initial connection after 10s
+    });
+    
+    logger.info('Connected to MongoDB');
+    dbConnected = true;
+  } catch (error) {
+    logger.warn('MongoDB connection failed, running in demo mode:', error.message);
+    logger.info('To connect to a database, please:');
+    logger.info('1. Set up MongoDB Atlas (cloud) or another MongoDB service');
+    logger.info('2. Update MONGODB_URI in your .env file');
+    logger.info('3. Restart the server');
+    dbConnected = false;
+  }
+}
+
+// Attempt database connection
+await connectToDatabase();
 
 // Socket.IO setup
 setupSocketHandlers(io);
@@ -116,10 +130,21 @@ app.set('io', io);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
+    database: dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     connections: io.engine.clientsCount
+  });
+});
+
+// Database status endpoint
+app.get('/api/db-status', (req, res) => {
+  res.json({
+    connected: dbConnected,
+    message: dbConnected 
+      ? 'Database connected successfully' 
+      : 'Database not connected - running in demo mode. Please configure MONGODB_URI in your environment variables.'
   });
 });
 
@@ -151,23 +176,33 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  // Don't exit on database connection rejections in demo mode
+  if (reason && reason.name !== 'MongooseServerSelectionError') {
+    process.exit(1);
+  }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
   server.close(() => {
-    mongoose.connection.close(false, () => {
-      logger.info('MongoDB connection closed');
+    if (dbConnected) {
+      mongoose.connection.close(false, () => {
+        logger.info('MongoDB connection closed');
+        process.exit(0);
+      });
+    } else {
       process.exit(0);
-    });
+    }
   });
 });
 
 server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  if (!dbConnected) {
+    logger.info('Running in demo mode - database features may be limited');
+  }
 });
 
 export default app;
