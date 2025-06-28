@@ -219,13 +219,11 @@ const schemeSchema = new mongoose.Schema({
   publishedAt: { type: Date },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
   },
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+    ref: 'User'
   },
   
   // Version Control
