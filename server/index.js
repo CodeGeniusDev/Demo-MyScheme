@@ -17,6 +17,7 @@ import schemeRoutes from './routes/schemes.js';
 import adminRoutes from './routes/admin.js';
 import analyticsRoutes from './routes/analytics.js';
 import uploadRoutes from './routes/upload.js';
+import publicSettingsRoutes from './routes/publicSettings.js';
 
 // Import middleware
 import { authenticateToken } from './middleware/auth.js';
@@ -155,6 +156,7 @@ app.use('/api/schemes', schemeRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/analytics', authenticateToken, analyticsRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
+app.use('/api/public-settings', publicSettingsRoutes);
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {

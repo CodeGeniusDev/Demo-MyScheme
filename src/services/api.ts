@@ -320,6 +320,12 @@ class ApiService {
     return response.data;
   }
 
+  // Public Settings (no auth required)
+  async getPublicSettings(): Promise<ApiResponse<any>> {
+    const response = await this.api.get('/public-settings');
+    return response.data;
+  }
+
   // Health Check
   async healthCheck(): Promise<ApiResponse<{ status: string; timestamp: string }>> {
     const response = await this.api.get('/health');

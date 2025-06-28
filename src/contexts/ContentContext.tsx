@@ -101,12 +101,13 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const loadSiteSettings = async () => {
     try {
-      const response = await apiService.getSystemSettings('theme');
+      const response = await apiService.getPublicSettings();
       if (response.success && response.data) {
         setSiteSettings(prev => ({ ...prev, ...response.data }));
       }
     } catch (error) {
       console.error('Failed to load site settings:', error);
+      // Don't show error toast for site settings as it's not critical
     }
   };
 
