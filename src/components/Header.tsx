@@ -16,6 +16,10 @@ const Header: React.FC = () => {
     navigate('/search');
   };
 
+  const gotoadminpanel = () => {
+    navigate('/admin');
+  };
+
   const handleLogoClick = () => {
     navigate('/');
   };
@@ -83,7 +87,7 @@ const Header: React.FC = () => {
             </button>
 
             {/* Sign In Button */}
-            <button className="hidden sm:flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium hover:shadow-md transform hover:scale-105">
+            <button onclick={gotoadminpanel} className="hidden sm:flex items-center space-x-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium hover:shadow-md transform hover:scale-105">
               <span>{t('header.signin')}</span>
               <ArrowRight className="h-3 w-3" />
             </button>
