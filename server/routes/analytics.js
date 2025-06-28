@@ -7,8 +7,21 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
+// Database connection check middleware
+const checkDbConnection = (req, res, next) => {
+  const dbConnected = req.app.get('dbConnected');
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service unavailable',
+      message: 'The database is currently not connected. Please try again later or contact support.'
+    });
+  }
+  next();
+};
+
 // Track analytics event
-router.post('/track', [
+router.post('/track', checkDbConnection, [
   body('type')
     .isIn(['page_view', 'search', 'scheme_view', 'application_start', 'user_action'])
     .withMessage('Invalid event type'),
@@ -78,7 +91,7 @@ router.post('/track', [
 }));
 
 // Get dashboard analytics
-router.get('/dashboard', requirePermission('analytics.read'), [
+router.get('/dashboard', requirePermission('analytics.read'), checkDbConnection, [
   query('dateRange').optional().isInt({ min: 1, max: 365 }).withMessage('Date range must be between 1 and 365 days')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -124,7 +137,7 @@ router.get('/dashboard', requirePermission('analytics.read'), [
 }));
 
 // Get live analytics
-router.get('/live', requirePermission('analytics.read'), asyncHandler(async (req, res) => {
+router.get('/live', requirePermission('analytics.read'), checkDbConnection, asyncHandler(async (req, res) => {
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 
@@ -180,7 +193,7 @@ router.get('/live', requirePermission('analytics.read'), asyncHandler(async (req
 }));
 
 // Get popular searches
-router.get('/popular-searches', requirePermission('analytics.read'), [
+router.get('/popular-searches', requirePermission('analytics.read'), checkDbConnection, [
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('dateRange').optional().isInt({ min: 1, max: 365 }).withMessage('Date range must be between 1 and 365 days')
 ], asyncHandler(async (req, res) => {
@@ -207,7 +220,7 @@ router.get('/popular-searches', requirePermission('analytics.read'), [
 }));
 
 // Get device statistics
-router.get('/device-stats', requirePermission('analytics.read'), [
+router.get('/device-stats', requirePermission('analytics.read'), checkDbConnection, [
   query('dateRange').optional().isInt({ min: 1, max: 365 }).withMessage('Date range must be between 1 and 365 days')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -230,7 +243,7 @@ router.get('/device-stats', requirePermission('analytics.read'), [
 }));
 
 // Get time series data
-router.get('/time-series', requirePermission('analytics.read'), [
+router.get('/time-series', requirePermission('analytics.read'), checkDbConnection, [
   query('type').optional().isIn(['all', 'page_view', 'search', 'scheme_view']).withMessage('Invalid type'),
   query('interval').optional().isIn(['hour', 'day', 'week', 'month']).withMessage('Invalid interval'),
   query('dateRange').optional().isInt({ min: 1, max: 365 }).withMessage('Date range must be between 1 and 365 days')

@@ -7,8 +7,21 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
+// Database connection check middleware
+const checkDbConnection = (req, res, next) => {
+  const dbConnected = req.app.get('dbConnected');
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service unavailable',
+      message: 'The database is currently not connected. Please try again later or contact support.'
+    });
+  }
+  next();
+};
+
 // Get current user profile
-router.get('/profile', asyncHandler(async (req, res) => {
+router.get('/profile', checkDbConnection, asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id)
     .select('-password -refreshTokens')
     .lean();
@@ -20,7 +33,7 @@ router.get('/profile', asyncHandler(async (req, res) => {
 }));
 
 // Update current user profile
-router.put('/profile', [
+router.put('/profile', checkDbConnection, [
   body('profile.firstName')
     .optional()
     .isLength({ max: 50 })
@@ -76,7 +89,7 @@ router.put('/profile', [
 }));
 
 // Change password
-router.put('/change-password', [
+router.put('/change-password', checkDbConnection, [
   body('currentPassword')
     .notEmpty()
     .withMessage('Current password is required'),
@@ -123,7 +136,7 @@ router.put('/change-password', [
 }));
 
 // Get all users (admin only)
-router.get('/', requireRole(['admin']), [
+router.get('/', requireRole(['admin']), checkDbConnection, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isLength({ max: 200 }).withMessage('Search query too long'),
@@ -207,7 +220,7 @@ router.get('/', requireRole(['admin']), [
 }));
 
 // Get user by ID (admin only)
-router.get('/:id', requireRole(['admin']), [
+router.get('/:id', requireRole(['admin']), checkDbConnection, [
   param('id').isMongoId().withMessage('Invalid user ID')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -237,7 +250,7 @@ router.get('/:id', requireRole(['admin']), [
 }));
 
 // Update user (admin only)
-router.put('/:id', requireRole(['admin']), [
+router.put('/:id', requireRole(['admin']), checkDbConnection, [
   param('id').isMongoId().withMessage('Invalid user ID'),
   body('role')
     .optional()
@@ -285,7 +298,7 @@ router.put('/:id', requireRole(['admin']), [
 }));
 
 // Delete user (admin only)
-router.delete('/:id', requireRole(['admin']), [
+router.delete('/:id', requireRole(['admin']), checkDbConnection, [
   param('id').isMongoId().withMessage('Invalid user ID')
 ], asyncHandler(async (req, res) => {
   const errors = validationResult(req);
@@ -323,7 +336,7 @@ router.delete('/:id', requireRole(['admin']), [
 }));
 
 // Get user statistics (admin only)
-router.get('/stats/overview', requireRole(['admin']), asyncHandler(async (req, res) => {
+router.get('/stats/overview', requireRole(['admin']), checkDbConnection, asyncHandler(async (req, res) => {
   const stats = await User.getStatistics();
   
   // Get additional stats

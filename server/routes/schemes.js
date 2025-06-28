@@ -7,8 +7,21 @@ import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
+// Database connection check middleware
+const checkDbConnection = (req, res, next) => {
+  const dbConnected = req.app.get('dbConnected');
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service unavailable',
+      message: 'The database is currently not connected. Please try again later or contact support.'
+    });
+  }
+  next();
+};
+
 // Get all schemes with filtering and pagination
-router.get('/', [
+router.get('/', checkDbConnection, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().isLength({ max: 200 }).withMessage('Search query too long'),
@@ -220,7 +233,7 @@ router.get('/', [
 });
 
 // Get scheme by ID or slug
-router.get('/:identifier', [
+router.get('/:identifier', checkDbConnection, [
   param('identifier').notEmpty().withMessage('Scheme identifier is required'),
   query('language').optional().isIn(['en', 'hi']).withMessage('Invalid language')
 ], async (req, res) => {
@@ -324,7 +337,7 @@ router.get('/:identifier', [
 });
 
 // Get trending schemes
-router.get('/trending/list', [
+router.get('/trending/list', checkDbConnection, [
   query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
   query('language').optional().isIn(['en', 'hi']).withMessage('Invalid language')
 ], async (req, res) => {
@@ -372,7 +385,7 @@ router.get('/trending/list', [
 });
 
 // Get scheme statistics
-router.get('/stats/overview', async (req, res) => {
+router.get('/stats/overview', checkDbConnection, async (req, res) => {
   try {
     const stats = await Scheme.getStatistics();
     

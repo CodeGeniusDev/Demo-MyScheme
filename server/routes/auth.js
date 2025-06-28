@@ -8,8 +8,21 @@ import { generateTokens, verifyRefreshToken } from '../utils/auth.js';
 
 const router = express.Router();
 
+// Database connection check middleware
+const checkDbConnection = (req, res, next) => {
+  const dbConnected = req.app.get('dbConnected');
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service unavailable',
+      message: 'The database is currently not connected. Please try again later or contact support.'
+    });
+  }
+  next();
+};
+
 // Register - Only allow real user registration
-router.post('/register', [
+router.post('/register', checkDbConnection, [
   body('username')
     .isLength({ min: 3, max: 30 })
     .withMessage('Username must be between 3 and 30 characters')
@@ -121,7 +134,7 @@ router.post('/register', [
 });
 
 // Login - Support both regular users and admin users
-router.post('/login', [
+router.post('/login', checkDbConnection, [
   body('identifier')
     .notEmpty()
     .withMessage('Email or username is required'),
@@ -234,7 +247,7 @@ router.post('/login', [
 });
 
 // Refresh Token
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', checkDbConnection, async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
@@ -338,7 +351,7 @@ router.post('/logout', async (req, res) => {
 });
 
 // Logout from all devices
-router.post('/logout-all', async (req, res) => {
+router.post('/logout-all', checkDbConnection, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -382,7 +395,7 @@ router.post('/logout-all', async (req, res) => {
 });
 
 // Forgot Password
-router.post('/forgot-password', [
+router.post('/forgot-password', checkDbConnection, [
   body('email')
     .isEmail()
     .normalizeEmail()
@@ -456,7 +469,7 @@ router.post('/forgot-password', [
 });
 
 // Reset Password
-router.post('/reset-password', [
+router.post('/reset-password', checkDbConnection, [
   body('token')
     .notEmpty()
     .withMessage('Reset token is required'),

@@ -108,6 +108,7 @@ async function connectToDatabase() {
     
     logger.info('Connected to MongoDB');
     dbConnected = true;
+    app.set('dbConnected', true);
   } catch (error) {
     logger.warn('MongoDB connection failed, running in demo mode:', error.message);
     logger.info('To connect to a database, please:');
@@ -115,8 +116,28 @@ async function connectToDatabase() {
     logger.info('2. Update MONGODB_URI in your .env file');
     logger.info('3. Restart the server');
     dbConnected = false;
+    app.set('dbConnected', false);
   }
 }
+
+// Monitor database connection status
+mongoose.connection.on('connected', () => {
+  logger.info('Mongoose connected to MongoDB');
+  dbConnected = true;
+  app.set('dbConnected', true);
+});
+
+mongoose.connection.on('error', (err) => {
+  logger.error('Mongoose connection error:', err);
+  dbConnected = false;
+  app.set('dbConnected', false);
+});
+
+mongoose.connection.on('disconnected', () => {
+  logger.warn('Mongoose disconnected from MongoDB');
+  dbConnected = false;
+  app.set('dbConnected', false);
+});
 
 // Attempt database connection
 await connectToDatabase();

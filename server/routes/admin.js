@@ -9,8 +9,21 @@ import { asyncHandler } from '../middleware/errorHandler.js';
 
 const router = express.Router();
 
+// Database connection check middleware
+const checkDbConnection = (req, res, next) => {
+  const dbConnected = req.app.get('dbConnected');
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: 'Database service unavailable',
+      message: 'The database is currently not connected. Please try again later or contact support.'
+    });
+  }
+  next();
+};
+
 // Get system statistics
-router.get('/system-stats', requireRole(['admin']), asyncHandler(async (req, res) => {
+router.get('/system-stats', requireRole(['admin']), checkDbConnection, asyncHandler(async (req, res) => {
   const [userStats, schemeStats, analyticsStats] = await Promise.all([
     User.getStatistics(),
     Scheme.getStatistics(),
@@ -40,7 +53,7 @@ router.get('/system-stats', requireRole(['admin']), asyncHandler(async (req, res
 }));
 
 // Get audit logs
-router.get('/audit-logs', requireRole(['admin']), [
+router.get('/audit-logs', requireRole(['admin']), checkDbConnection, [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('action').optional().isLength({ max: 100 }).withMessage('Action filter too long'),
@@ -237,7 +250,7 @@ router.put('/settings/:key', requireRole(['admin']), [
 }));
 
 // Export data
-router.post('/export', requireRole(['admin']), [
+router.post('/export', requireRole(['admin']), checkDbConnection, [
   body('type')
     .isIn(['users', 'schemes', 'analytics', 'audit-logs'])
     .withMessage('Invalid export type'),
@@ -352,7 +365,7 @@ function convertToCSV(data) {
 }
 
 // Bulk operations
-router.post('/bulk-operations', requireRole(['admin']), [
+router.post('/bulk-operations', requireRole(['admin']), checkDbConnection, [
   body('operation')
     .isIn(['activate', 'deactivate', 'delete', 'update-role'])
     .withMessage('Invalid operation'),
