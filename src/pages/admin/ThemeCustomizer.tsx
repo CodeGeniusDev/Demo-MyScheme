@@ -1,92 +1,69 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Palette, Type, Layout, Eye, RotateCcw } from 'lucide-react';
+import { Save, Palette, Type, Layout, Eye, RotateCcw, Loader2 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useContent } from '../../contexts/ContentContext';
 import { useRealTimeStore } from '../../store/realTimeStore';
 import toast from 'react-hot-toast';
 
 const ThemeCustomizer: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
+  const { siteSettings, updateSiteSettings } = useContent();
   const { sendMessage } = useRealTimeStore();
   
-  const [themeSettings, setThemeSettings] = useState({
-    // Colors
-    primaryColor: '#16a34a',
-    secondaryColor: '#3b82f6',
-    accentColor: '#f59e0b',
-    backgroundColor: '#ffffff',
-    surfaceColor: '#f9fafb',
-    textColor: '#111827',
-    borderColor: '#e5e7eb',
-    
-    // Typography
-    fontFamily: 'Inter',
-    fontSize: '16',
-    fontWeight: '400',
-    lineHeight: '1.5',
-    
-    // Layout
-    borderRadius: '8',
-    spacing: '16',
-    maxWidth: '1200',
-    headerHeight: '64',
-    
-    // Effects
-    shadowIntensity: 'medium',
-    animationSpeed: 'normal'
-  });
-
+  const [themeSettings, setThemeSettings] = useState(siteSettings);
   const [previewMode, setPreviewMode] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // Load saved theme settings
-    const saved = localStorage.getItem('customThemeSettings');
-    if (saved) {
-      try {
-        setThemeSettings(JSON.parse(saved));
-      } catch (error) {
-        console.error('Failed to load theme settings:', error);
-      }
-    }
-  }, []);
+    setThemeSettings(siteSettings);
+  }, [siteSettings]);
 
-  const applyTheme = () => {
+  const applyTheme = (settings = themeSettings) => {
     const root = document.documentElement;
     
     // Apply color variables
-    root.style.setProperty('--color-primary', themeSettings.primaryColor);
-    root.style.setProperty('--color-secondary', themeSettings.secondaryColor);
-    root.style.setProperty('--color-accent', themeSettings.accentColor);
-    root.style.setProperty('--color-background', themeSettings.backgroundColor);
-    root.style.setProperty('--color-surface', themeSettings.surfaceColor);
-    root.style.setProperty('--color-text', themeSettings.textColor);
-    root.style.setProperty('--color-border', themeSettings.borderColor);
+    root.style.setProperty('--color-primary', settings.primaryColor);
+    root.style.setProperty('--color-secondary', settings.secondaryColor);
+    root.style.setProperty('--color-accent', settings.accentColor);
+    root.style.setProperty('--color-background', settings.backgroundColor);
+    root.style.setProperty('--color-surface', settings.surfaceColor);
+    root.style.setProperty('--color-text', settings.textColor);
+    root.style.setProperty('--color-border', settings.borderColor);
     
     // Apply typography
-    root.style.setProperty('--font-family', themeSettings.fontFamily);
-    root.style.setProperty('--font-size-base', `${themeSettings.fontSize}px`);
-    root.style.setProperty('--font-weight-normal', themeSettings.fontWeight);
-    root.style.setProperty('--line-height', themeSettings.lineHeight);
+    root.style.setProperty('--font-family', settings.fontFamily);
+    root.style.setProperty('--font-size-base', `${settings.fontSize}px`);
+    root.style.setProperty('--font-weight-normal', settings.fontWeight);
+    root.style.setProperty('--line-height', settings.lineHeight);
     
     // Apply layout
-    root.style.setProperty('--border-radius', `${themeSettings.borderRadius}px`);
-    root.style.setProperty('--spacing-base', `${themeSettings.spacing}px`);
-    root.style.setProperty('--max-width', `${themeSettings.maxWidth}px`);
-    root.style.setProperty('--header-height', `${themeSettings.headerHeight}px`);
+    root.style.setProperty('--border-radius', `${settings.borderRadius}px`);
+    root.style.setProperty('--spacing-base', `${settings.spacing}px`);
+    root.style.setProperty('--max-width', `${settings.maxWidth}px`);
+    root.style.setProperty('--header-height', `${settings.headerHeight}px`);
   };
 
-  const handleSave = () => {
-    localStorage.setItem('customThemeSettings', JSON.stringify(themeSettings));
-    applyTheme();
-    
-    // Send real-time update to all users
-    sendMessage('theme_updated', themeSettings);
-    
-    toast.success('Theme settings saved and applied!');
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      await updateSiteSettings(themeSettings);
+      
+      // Send real-time update to all users
+      sendMessage('theme_updated', themeSettings);
+      
+      toast.success('Theme settings saved and applied globally!');
+    } catch (error) {
+      console.error('Failed to save theme settings:', error);
+      toast.error('Failed to save theme settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm('Are you sure you want to reset all theme settings to default?')) {
       const defaultSettings = {
+        defaultTheme: 'system' as const,
         primaryColor: '#16a34a',
         secondaryColor: '#3b82f6',
         accentColor: '#f59e0b',
@@ -103,60 +80,30 @@ const ThemeCustomizer: React.FC = () => {
         maxWidth: '1200',
         headerHeight: '64',
         shadowIntensity: 'medium',
-        animationSpeed: 'normal'
+        animationSpeed: 'normal',
+        lastUpdated: new Date().toISOString()
       };
       
       setThemeSettings(defaultSettings);
-      localStorage.setItem('customThemeSettings', JSON.stringify(defaultSettings));
-      applyTheme();
+      applyTheme(defaultSettings);
       
-      sendMessage('theme_reset', defaultSettings);
-      toast.success('Theme reset to default settings!');
+      try {
+        await updateSiteSettings(defaultSettings);
+        sendMessage('theme_reset', defaultSettings);
+        toast.success('Theme reset to default settings!');
+      } catch (error) {
+        console.error('Failed to reset theme:', error);
+        toast.error('Failed to reset theme');
+      }
     }
   };
 
   const updateSetting = (key: string, value: string) => {
-    setThemeSettings(prev => ({ ...prev, [key]: value }));
+    const newSettings = { ...themeSettings, [key]: value };
+    setThemeSettings(newSettings);
     
     if (previewMode) {
-      // Apply changes immediately in preview mode
-      const root = document.documentElement;
-      
-      switch (key) {
-        case 'primaryColor':
-          root.style.setProperty('--color-primary', value);
-          break;
-        case 'secondaryColor':
-          root.style.setProperty('--color-secondary', value);
-          break;
-        case 'accentColor':
-          root.style.setProperty('--color-accent', value);
-          break;
-        case 'backgroundColor':
-          root.style.setProperty('--color-background', value);
-          break;
-        case 'surfaceColor':
-          root.style.setProperty('--color-surface', value);
-          break;
-        case 'textColor':
-          root.style.setProperty('--color-text', value);
-          break;
-        case 'borderColor':
-          root.style.setProperty('--color-border', value);
-          break;
-        case 'fontFamily':
-          root.style.setProperty('--font-family', value);
-          break;
-        case 'fontSize':
-          root.style.setProperty('--font-size-base', `${value}px`);
-          break;
-        case 'borderRadius':
-          root.style.setProperty('--border-radius', `${value}px`);
-          break;
-        case 'spacing':
-          root.style.setProperty('--spacing-base', `${value}px`);
-          break;
-      }
+      applyTheme(newSettings);
     }
   };
 
@@ -195,17 +142,23 @@ const ThemeCustomizer: React.FC = () => {
           </button>
           <button
             onClick={handleReset}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center space-x-2"
+            disabled={saving}
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200 flex items-center space-x-2 disabled:opacity-50"
           >
             <RotateCcw className="h-4 w-4" />
             <span>Reset</span>
           </button>
           <button
             onClick={handleSave}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200"
+            disabled={saving}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg flex items-center space-x-2 transition-colors duration-200 disabled:opacity-50"
           >
-            <Save className="h-4 w-4" />
-            <span>Save & Apply</span>
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            <span>{saving ? 'Saving...' : 'Save & Apply Globally'}</span>
           </button>
         </div>
       </div>
@@ -263,13 +216,13 @@ const ThemeCustomizer: React.FC = () => {
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
-                    value={themeSettings[color.key as keyof typeof themeSettings]}
+                    value={themeSettings[color.key as keyof typeof themeSettings] as string}
                     onChange={(e) => updateSetting(color.key, e.target.value)}
                     className="w-8 h-8 rounded border border-gray-300 dark:border-gray-600"
                   />
                   <input
                     type="text"
-                    value={themeSettings[color.key as keyof typeof themeSettings]}
+                    value={themeSettings[color.key as keyof typeof themeSettings] as string}
                     onChange={(e) => updateSetting(color.key, e.target.value)}
                     className="w-20 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
@@ -417,7 +370,7 @@ const ThemeCustomizer: React.FC = () => {
           </div>
         </div>
 
-        {/* Preview */}
+        {/* Live Preview */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Live Preview</h3>
           
@@ -452,7 +405,7 @@ const ThemeCustomizer: React.FC = () => {
                   opacity: 0.8
                 }}
               >
-                This is how your content will look with the current theme settings.
+                This is how your content will look with the current theme settings. Changes apply globally to all users.
               </p>
               <button
                 className="px-4 py-2 rounded text-white font-medium"
@@ -467,7 +420,14 @@ const ThemeCustomizer: React.FC = () => {
             </div>
 
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              {previewMode ? 'Live preview is active - changes apply immediately' : 'Enable live preview to see changes in real-time'}
+              {previewMode ? (
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span>Live preview active - changes apply immediately</span>
+                </div>
+              ) : (
+                'Enable live preview to see changes in real-time'
+              )}
             </div>
           </div>
         </div>

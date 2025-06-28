@@ -1,23 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Share2, Facebook, Twitter, Linkedin, Copy, ExternalLink, Calendar, MapPin, Building, Users, FileText, CheckCircle, MessageSquare } from 'lucide-react';
-import { mockSchemes, Scheme } from '../data/schemes';
+import { Scheme } from '../data/schemes';
 import { useLanguage } from '../contexts/LanguageContext';
+import { apiService } from '../services/api';
+import { useContent } from '../contexts/ContentContext';
 
 const SchemeDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { schemes } = useContent();
   const [scheme, setScheme] = useState<Scheme | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('details');
   const [showShareMenu, setShowShareMenu] = useState(false);
 
   useEffect(() => {
     if (id) {
-      const foundScheme = mockSchemes.find(s => s.id === id);
-      setScheme(foundScheme || null);
+      loadScheme(id);
     }
   }, [id]);
+
+  const loadScheme = async (schemeId: string) => {
+    try {
+      setLoading(true);
+      
+      // Try to get from API first
+      const response = await apiService.getScheme(schemeId);
+      if (response.success && response.data) {
+        setScheme(response.data);
+      } else {
+        // Fallback to context schemes
+        const foundScheme = schemes.find(s => s.id === schemeId);
+        setScheme(foundScheme || null);
+      }
+      
+      // Track scheme view
+      if (schemeId) {
+        apiService.trackSchemeView(schemeId);
+      }
+    } catch (error) {
+      console.error('Failed to load scheme:', error);
+      // Fallback to context schemes
+      const foundScheme = schemes.find(s => s.id === schemeId);
+      setScheme(foundScheme || null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleShare = (platform: string) => {
     const url = window.location.href;
@@ -49,6 +80,14 @@ const SchemeDetail: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
   if (!scheme) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -72,8 +111,7 @@ const SchemeDetail: React.FC = () => {
     { id: 'application', label: 'Application Process', icon: ExternalLink },
     { id: 'documents', label: 'Documents Required', icon: Copy },
     { id: 'faqs', label: 'FAQs', icon: MessageSquare },
-    { id: 'sources', label: 'Sources & References', icon: ExternalLink },
-    { id: 'feedback', label: 'Feedback', icon: MessageSquare }
+    { id: 'sources', label: 'Sources & References', icon: ExternalLink }
   ];
 
   return (
@@ -180,7 +218,7 @@ const SchemeDetail: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4" />
-                    <span>Updated: {scheme.lastUpdated}</span>
+                    <span>Updated: {new Date(scheme.lastUpdated).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
@@ -213,41 +251,21 @@ const SchemeDetail: React.FC = () => {
                 <section id="benefits">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Benefits</h2>
                   <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
-                        <thead>
-                          <tr className="bg-gray-100 dark:bg-gray-600">
-                            <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-white font-semibold">
-                              Benefit Type
-                            </th>
-                            <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left text-gray-900 dark:text-white font-semibold">
-                              Details
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-700 dark:text-gray-300 font-medium">
-                              Financial Benefits
-                            </td>
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-600 dark:text-gray-300">
-                              {scheme.benefits.financial}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-700 dark:text-gray-300 font-medium">
-                              Non-Financial Benefits
-                            </td>
-                            <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-gray-600 dark:text-gray-300">
-                              <ul className="list-disc list-inside space-y-1">
-                                {scheme.benefits.nonFinancial?.map((benefit, index) => (
-                                  <li key={index}>{benefit}</li>
-                                ))}
-                              </ul>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Financial Benefits</h3>
+                        <p className="text-gray-600 dark:text-gray-300">{scheme.benefits.financial}</p>
+                      </div>
+                      {scheme.benefits.nonFinancial && scheme.benefits.nonFinancial.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Non-Financial Benefits</h3>
+                          <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300">
+                            {scheme.benefits.nonFinancial.map((benefit, index) => (
+                              <li key={index}>{benefit}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -275,35 +293,15 @@ const SchemeDetail: React.FC = () => {
                 {/* Application Process Section */}
                 <section id="application">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Application Process</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Online Process</h3>
-                      <div className="space-y-4">
-                        {scheme.applicationProcess.map((step, index) => (
-                          <div key={index} className="flex items-start space-x-3">
-                            <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-medium">
-                              {index + 1}
-                            </div>
-                            <p className="text-gray-600 dark:text-gray-300 pt-1">{step}</p>
-                          </div>
-                        ))}
+                  <div className="space-y-4">
+                    {scheme.applicationProcess.map((step, index) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-medium">
+                          {index + 1}
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-300 pt-1">{step}</p>
                       </div>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Offline Process</h3>
-                      <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-4">
-                        <p className="text-gray-600 dark:text-gray-300 mb-4">
-                          Visit the nearest government office or authorized center with required documents.
-                        </p>
-                        <ul className="space-y-2 text-gray-600 dark:text-gray-300">
-                          <li>• Collect application form from office</li>
-                          <li>• Fill form with accurate details</li>
-                          <li>• Attach required documents</li>
-                          <li>• Submit to concerned officer</li>
-                          <li>• Collect acknowledgment receipt</li>
-                        </ul>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </section>
 
@@ -345,26 +343,6 @@ const SchemeDetail: React.FC = () => {
                         <span className="text-gray-700 dark:text-gray-300">{source}</span>
                       </div>
                     ))}
-                  </div>
-                </section>
-
-                {/* Feedback Section */}
-                <section id="feedback">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Feedback</h2>
-                  <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-6">
-                    <p className="text-gray-600 dark:text-gray-300 mb-4">
-                      Help us improve this scheme information. Share your feedback or report any issues.
-                    </p>
-                    <div className="space-y-4">
-                      <textarea
-                        placeholder="Share your feedback..."
-                        rows={4}
-                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-500"
-                      />
-                      <button className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
-                        Submit Feedback
-                      </button>
-                    </div>
                   </div>
                 </section>
               </div>

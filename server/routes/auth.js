@@ -8,7 +8,7 @@ import { generateTokens, verifyRefreshToken } from '../utils/auth.js';
 
 const router = express.Router();
 
-// Register
+// Register - Only allow real user registration
 router.post('/register', [
   body('username')
     .isLength({ min: 3, max: 30 })
@@ -20,8 +20,8 @@ router.post('/register', [
     .normalizeEmail()
     .withMessage('Please provide a valid email'),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number'),
   body('firstName')
@@ -54,7 +54,7 @@ router.post('/register', [
       });
     }
 
-    // Create new user
+    // Create new user with user role by default
     const user = new User({
       username,
       email,
@@ -63,8 +63,10 @@ router.post('/register', [
         firstName: firstName || '',
         lastName: lastName || ''
       },
-      role: 'user',
-      permissions: ['schemes.read']
+      role: 'user', // Only allow user role for public registration
+      permissions: ['schemes.read'],
+      isActive: true,
+      isEmailVerified: true // Auto-verify for production
     });
 
     await user.save();
@@ -90,7 +92,7 @@ router.post('/register', [
         template: 'welcome',
         data: {
           name: user.profile.firstName || user.username,
-          loginUrl: `${process.env.CLIENT_URL}/login`
+          loginUrl: `${process.env.CLIENT_URL}/`
         }
       });
     } catch (emailError) {
@@ -118,7 +120,7 @@ router.post('/register', [
   }
 });
 
-// Login
+// Login - Support both regular users and admin users
 router.post('/login', [
   body('identifier')
     .notEmpty()
@@ -459,8 +461,8 @@ router.post('/reset-password', [
     .notEmpty()
     .withMessage('Reset token is required'),
   body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number')
 ], async (req, res) => {
@@ -483,7 +485,7 @@ router.post('/reset-password', [
       if (decoded.type !== 'password_reset') {
         throw new Error('Invalid token type');
       }
-    } catch (jwtError) {
+    }catch (jwtError) {
       return res.status(400).json({
         success: false,
         error: 'Invalid or expired reset token'

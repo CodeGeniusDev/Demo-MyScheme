@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiService } from '../services/api';
 import toast from 'react-hot-toast';
 
 interface AdminUser {
@@ -21,62 +22,27 @@ interface AdminContextType {
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
-// Production admin credentials - In real production, these would be in a secure database
-const ADMIN_CREDENTIALS = [
-  {
-    username: 'admin',
-    password: 'SecureAdmin2024!',
-    user: {
-      id: '1',
-      username: 'admin',
-      email: 'admin@myscheme.gov.in',
-      role: 'admin' as const,
-      lastLogin: new Date().toISOString(),
-      permissions: ['all']
-    }
-  },
-  {
-    username: 'editor',
-    password: 'SecureEditor2024!',
-    user: {
-      id: '2',
-      username: 'editor',
-      email: 'editor@myscheme.gov.in',
-      role: 'editor' as const,
-      lastLogin: new Date().toISOString(),
-      permissions: ['articles.read', 'articles.write', 'theme.read', 'theme.write']
-    }
-  }
-];
-
 export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<AdminUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const savedAuth = localStorage.getItem('admin_auth');
-    const sessionToken = sessionStorage.getItem('admin_session');
+    // Check if user is already logged in via main auth system
+    const token = localStorage.getItem('accessToken');
+    const userData = localStorage.getItem('userData');
     
-    if (savedAuth && sessionToken) {
+    if (token && userData) {
       try {
-        const authData = JSON.parse(savedAuth);
-        const sessionData = JSON.parse(sessionToken);
-        
-        // Verify session is still valid (8 hours for production)
-        const sessionAge = Date.now() - sessionData.timestamp;
-        if (sessionAge < 8 * 60 * 60 * 1000) {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.role === 'admin' || parsedUser.role === 'editor') {
           setIsAuthenticated(true);
-          setUser(authData.user);
-        } else {
-          // Session expired
-          localStorage.removeItem('admin_auth');
-          sessionStorage.removeItem('admin_session');
+          setUser(parsedUser);
         }
       } catch (error) {
-        localStorage.removeItem('admin_auth');
-        sessionStorage.removeItem('admin_session');
+        console.error('Error parsing user data:', error);
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('userData');
       }
     }
     setLoading(false);
@@ -85,45 +51,46 @@ export const AdminProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const login = async (username: string, password: string): Promise<boolean> => {
     setLoading(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const credential = ADMIN_CREDENTIALS.find(
-      cred => cred.username === username && cred.password === password
-    );
-    
-    if (credential) {
-      const authData = {
-        user: {
-          ...credential.user,
-          lastLogin: new Date().toISOString()
+    try {
+      const response = await apiService.login({
+        identifier: username,
+        password: password
+      });
+      
+      if (response.success && response.data) {
+        const { user: userData, token } = response.data;
+        
+        // Check if user has admin/editor role
+        if (userData.role === 'admin' || userData.role === 'editor') {
+          localStorage.setItem('accessToken', token);
+          localStorage.setItem('userData', JSON.stringify(userData));
+          
+          setIsAuthenticated(true);
+          setUser(userData);
+          setLoading(false);
+          
+          toast.success(`Welcome back, ${userData.username}!`);
+          return true;
+        } else {
+          toast.error('Access denied. Admin privileges required.');
+          setLoading(false);
+          return false;
         }
-      };
+      }
       
-      const sessionData = {
-        token: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: Date.now(),
-        userId: credential.user.id
-      };
-      
-      localStorage.setItem('admin_auth', JSON.stringify(authData));
-      sessionStorage.setItem('admin_session', JSON.stringify(sessionData));
-      
-      setIsAuthenticated(true);
-      setUser(authData.user);
       setLoading(false);
-      
-      toast.success(`Welcome back, ${credential.user.username}!`);
-      return true;
-    } else {
+      return false;
+    } catch (error: any) {
       setLoading(false);
+      const message = error.response?.data?.error || 'Login failed';
+      toast.error(message);
       return false;
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('admin_auth');
-    sessionStorage.removeItem('admin_session');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('userData');
     setIsAuthenticated(false);
     setUser(null);
     toast.success('Logged out successfully');

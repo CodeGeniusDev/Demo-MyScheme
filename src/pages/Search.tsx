@@ -1,13 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search as SearchIcon, Filter, ChevronDown, ArrowLeft, Plus, Minus } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { mockSchemes, filterOptions, Scheme } from '../data/schemes';
+import { useContent } from '../contexts/ContentContext';
+import { filterOptions, Scheme } from '../data/schemes';
+import { apiService } from '../services/api';
 
 const Search: React.FC = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { schemes: contextSchemes, loading: contextLoading } = useContent();
+  
+  const [schemes, setSchemes] = useState<Scheme[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'all');
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [sortBy, setSortBy] = useState('relevance');
@@ -39,6 +45,34 @@ const Search: React.FC = () => {
     benefitType: false
   });
 
+  // Load schemes from API
+  useEffect(() => {
+    loadSchemes();
+  }, []);
+
+  const loadSchemes = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getSchemes({ 
+        status: 'published',
+        limit: 100 
+      });
+      
+      if (response.success && response.data) {
+        setSchemes(response.data.items || []);
+      } else {
+        // Fallback to context schemes if API fails
+        setSchemes(contextSchemes);
+      }
+    } catch (error) {
+      console.error('Failed to load schemes:', error);
+      // Fallback to context schemes
+      setSchemes(contextSchemes);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const tabs = [
     { id: 'all', label: t('search.tabs.all') },
     { id: 'state', label: t('search.tabs.state') },
@@ -46,7 +80,7 @@ const Search: React.FC = () => {
   ];
 
   const filteredSchemes = useMemo(() => {
-    let filtered = mockSchemes;
+    let filtered = schemes;
 
     // Filter by tab
     if (activeTab === 'state') {
@@ -91,7 +125,7 @@ const Search: React.FC = () => {
     }
 
     return filtered;
-  }, [activeTab, searchQuery, filters, sortBy]);
+  }, [schemes, activeTab, searchQuery, filters, sortBy]);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -122,6 +156,11 @@ const Search: React.FC = () => {
       newParams.delete('q');
     }
     setSearchParams(newParams);
+
+    // Track search analytics
+    if (query.trim()) {
+      apiService.trackSearch(query, filters, filteredSchemes.length);
+    }
   };
 
   const resetFilters = () => {
@@ -158,6 +197,8 @@ const Search: React.FC = () => {
   };
 
   const handleSchemeClick = (schemeId: string) => {
+    // Track scheme view
+    apiService.trackSchemeView(schemeId);
     navigate(`/scheme/${schemeId}`);
   };
 
@@ -335,58 +376,70 @@ const Search: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Loading State */}
+                {loading && (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                    <span className="ml-3 text-gray-600 dark:text-gray-400">Loading schemes...</span>
+                  </div>
+                )}
+
                 {/* Schemes List */}
-                <div className="space-y-6">
-                  {filteredSchemes.length > 0 ? (
-                    filteredSchemes.map((scheme) => (
-                      <div
-                        key={scheme.id}
-                        className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition-all duration-200 hover:border-green-300 dark:hover:border-green-600"
-                      >
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <h3 
+                {!loading && (
+                  <div className="space-y-6">
+                    {filteredSchemes.length > 0 ? (
+                      filteredSchemes.map((scheme) => (
+                        <div
+                          key={scheme.id}
+                          className="border border-gray-200 dark:border-gray-700 rounded-xl p-6 hover:shadow-lg transition-all duration-200 hover:border-green-300 dark:hover:border-green-600"
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex-1">
+                              <h3 
+                                onClick={() => handleSchemeClick(scheme.id)}
+                                className="text-xl font-semibold text-gray-900 dark:text-white mb-2 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-200 cursor-pointer"
+                              >
+                                {scheme.title}
+                              </h3>
+                              <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                                <span className="font-medium text-green-600 dark:text-green-400">{scheme.state}</span>
+                                <span>•</span>
+                                <span>{scheme.ministry}</span>
+                                <span>•</span>
+                                <span className="capitalize">{scheme.schemeType}</span>
+                              </div>
+                              <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
+                                {scheme.description}
+                              </p>
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {scheme.tags.map((tag, tagIndex) => (
+                                  <span
+                                    key={tagIndex}
+                                    className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-sm border border-gray-300 dark:border-gray-600"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <button
                               onClick={() => handleSchemeClick(scheme.id)}
-                              className="text-xl font-semibold text-gray-900 dark:text-white mb-2 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-200 cursor-pointer"
+                              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ml-4"
                             >
-                              {scheme.title}
-                            </h3>
-                            <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                              <span className="font-medium text-green-600 dark:text-green-400">{scheme.state}</span>
-                              <span>•</span>
-                              <span>{scheme.ministry}</span>
-                            </div>
-                            <p className="text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">
-                              {scheme.description}
-                            </p>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                              {scheme.tags.map((tag, tagIndex) => (
-                                <span
-                                  key={tagIndex}
-                                  className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1 rounded-lg text-sm border border-gray-300 dark:border-gray-600"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
+                              Check Eligibility
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleSchemeClick(scheme.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ml-4"
-                          >
-                            Check Eligibility
-                          </button>
                         </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12">
+                        <SearchIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No schemes found</h3>
+                        <p className="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or filters</p>
                       </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-12">
-                      <SearchIcon className="h-16 w-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No schemes found</h3>
-                      <p className="text-gray-500 dark:text-gray-400">Try adjusting your search criteria or filters</p>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

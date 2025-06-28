@@ -129,7 +129,7 @@ const AdminLayout: React.FC = () => {
 
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-1 text-xs text-green-600 dark:text-green-400">
-                <Shield className="h-4 w-4" />
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span>Live</span>
               </div>
             </div>
