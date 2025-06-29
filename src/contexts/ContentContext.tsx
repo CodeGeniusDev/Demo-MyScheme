@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Scheme, filterOptions } from '../data/schemes';
+import { Scheme, filterOptions, schemes as fallbackSchemes } from '../data/schemes';
 import { apiService } from '../services/api';
 import { useRealTimeStore } from '../store/realTimeStore';
 import toast from 'react-hot-toast';
@@ -37,6 +37,7 @@ interface ContentContextType {
   filterOptions: typeof filterOptions;
   siteSettings: SiteSettings;
   loading: boolean;
+  demoMode: boolean;
   
   // Scheme Management
   addScheme: (scheme: Omit<Scheme, 'id' | 'createdBy' | 'lastUpdated'>) => Promise<void>;
@@ -55,6 +56,7 @@ const ContentContext = createContext<ContentContextType | undefined>(undefined);
 export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [schemes, setSchemes] = useState<Scheme[]>([]);
   const [loading, setLoading] = useState(true);
+  const [demoMode, setDemoMode] = useState(false);
   const { sendMessage } = useRealTimeStore();
   
   const [siteSettings, setSiteSettings] = useState<SiteSettings>({
@@ -84,16 +86,66 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
     loadSiteSettings();
   }, []);
 
+  const checkDatabaseStatus = async () => {
+    try {
+      const response = await fetch('/api/db-status');
+      const data = await response.json();
+      return data.connected;
+    } catch (error) {
+      console.error('Failed to check database status:', error);
+      return false;
+    }
+  };
+
   const loadSchemes = async () => {
     try {
       setLoading(true);
+      
+      // First check if database is available
+      const dbConnected = await checkDatabaseStatus();
+      
+      if (!dbConnected) {
+        // Database not available, use fallback data
+        console.warn('Database not connected, using demo data');
+        setDemoMode(true);
+        setSchemes(fallbackSchemes);
+        toast('Running in demo mode - database not connected', {
+          icon: '⚠️',
+          duration: 4000,
+        });
+        return;
+      }
+
+      // Database is available, try to fetch from API
       const response = await apiService.getSchemes({ status: 'published' });
       if (response.success && response.data) {
-        setSchemes(response.data.items || []);
+        setSchemes(response.data.schemes || response.data.items || []);
+        setDemoMode(false);
+      } else {
+        // API call succeeded but no data, fall back to demo data
+        console.warn('No schemes data received, using demo data');
+        setDemoMode(true);
+        setSchemes(fallbackSchemes);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load schemes:', error);
-      toast.error('Failed to load schemes');
+      
+      // Check if it's a 503 error (service unavailable)
+      if (error.response?.status === 503) {
+        console.warn('Service unavailable, using demo data');
+        setDemoMode(true);
+        setSchemes(fallbackSchemes);
+        toast('Database service unavailable - using demo data', {
+          icon: '⚠️',
+          duration: 4000,
+        });
+      } else {
+        // Other errors, still try to use demo data
+        console.warn('API error, falling back to demo data');
+        setDemoMode(true);
+        setSchemes(fallbackSchemes);
+        toast.error('Failed to load schemes - using demo data');
+      }
     } finally {
       setLoading(false);
     }
@@ -108,10 +160,16 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch (error) {
       console.error('Failed to load site settings:', error);
       // Don't show error toast for site settings as it's not critical
+      // Use default settings which are already set in state
     }
   };
 
   const addScheme = async (schemeData: Omit<Scheme, 'id' | 'createdBy' | 'lastUpdated'>) => {
+    if (demoMode) {
+      toast.error('Cannot add schemes in demo mode - database not connected');
+      throw new Error('Demo mode: database not connected');
+    }
+
     try {
       const response = await apiService.createScheme({
         ...schemeData,
@@ -136,6 +194,11 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateScheme = async (id: string, updates: Partial<Scheme>) => {
+    if (demoMode) {
+      toast.error('Cannot update schemes in demo mode - database not connected');
+      throw new Error('Demo mode: database not connected');
+    }
+
     try {
       const response = await apiService.updateScheme(id, {
         ...updates,
@@ -161,6 +224,11 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const deleteScheme = async (id: string) => {
+    if (demoMode) {
+      toast.error('Cannot delete schemes in demo mode - database not connected');
+      throw new Error('Demo mode: database not connected');
+    }
+
     try {
       const response = await apiService.deleteScheme(id);
       
@@ -184,6 +252,24 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const updateSiteSettings = async (newSettings: Partial<SiteSettings>) => {
+    if (demoMode) {
+      // In demo mode, still allow theme changes locally
+      const updatedSettings = {
+        ...siteSettings,
+        ...newSettings,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      setSiteSettings(updatedSettings);
+      applyThemeSettings(updatedSettings);
+      
+      toast('Theme updated locally (demo mode)', {
+        icon: '🎨',
+        duration: 3000,
+      });
+      return;
+    }
+
     try {
       const updatedSettings = {
         ...siteSettings,
@@ -244,6 +330,7 @@ export const ContentProvider: React.FC<{ children: ReactNode }> = ({ children })
       filterOptions,
       siteSettings,
       loading,
+      demoMode,
       addScheme,
       updateScheme,
       deleteScheme,
