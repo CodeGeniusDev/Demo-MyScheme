@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import HeroCarousel from '../components/HeroCarousel';
 import CategoryGrid from '../components/CategoryGrid';
 import { PopularSchemes } from '../components/PopularSchemes';
-import { HowItWorks } from '../components/HowItWorks';
+import HowItWorks from '../components/HowItWorks';
 import { Testimonials } from '../components/Testimonials';
 import CTABanner from '../components/CTABanner';
 import { DemoModeNotice } from '../components/common/DemoModeNotice';
