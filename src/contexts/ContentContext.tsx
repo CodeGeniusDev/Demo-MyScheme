@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Scheme, filterOptions, schemes as fallbackSchemes } from '../data/schemes';
+import { Scheme, filterOptions, mockSchemes as fallbackSchemes } from '../data/schemes';
 import { apiService } from '../services/api';
 import { useRealTimeStore } from '../store/realTimeStore';
 import toast from 'react-hot-toast';

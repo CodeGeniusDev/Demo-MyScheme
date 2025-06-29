@@ -13,7 +13,7 @@ import PWAInstallPrompt from './components/common/PWAInstallPrompt';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Chatbot from './components/Chatbot';
-import Home from './pages/Home';
+import { Home } from './pages/Home';
 import Search from './pages/Search';
 import SchemeDetail from './pages/SchemeDetail';
 import AdminLogin from './components/admin/AdminLogin';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HeroCarousel } from '../components/HeroCarousel';
+import HeroCarousel from '../components/HeroCarousel';
 import { CategoryGrid } from '../components/CategoryGrid';
 import { PopularSchemes } from '../components/PopularSchemes';
 import { HowItWorks } from '../components/HowItWorks';
