@@ -4,7 +4,7 @@ import { CategoryGrid } from '../components/CategoryGrid';
 import { PopularSchemes } from '../components/PopularSchemes';
 import { HowItWorks } from '../components/HowItWorks';
 import { Testimonials } from '../components/Testimonials';
-import { CTABanner } from '../components/CTABanner';
+import CTABanner from '../components/CTABanner';
 import { DemoModeNotice } from '../components/common/DemoModeNotice';
 import { useContent } from '../contexts/ContentContext';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
