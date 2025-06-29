@@ -7,7 +7,7 @@ import { Testimonials } from '../components/Testimonials';
 import CTABanner from '../components/CTABanner';
 import { DemoModeNotice } from '../components/common/DemoModeNotice';
 import { useContent } from '../contexts/ContentContext';
-import { LoadingSpinner } from '../components/common/LoadingSpinner';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export const Home: React.FC = () => {
   const { loading } = useContent();
