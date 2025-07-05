@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 
 const Footer: React.FC = () => {
   const { t } = useLanguage();
-     
+
   const quickLinks = [
     t('footer.aboutus'),
     t('footer.contactus'),
