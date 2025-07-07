@@ -11,10 +11,6 @@ import {
 } from 'lucide-react';
 import { useAdmin } from '../../contexts/AdminContext';
 
-
-
-
-
 const AdminLayout: React.FC = () => {
   const { user, logout } = useAdmin();
   const navigate = useNavigate();
