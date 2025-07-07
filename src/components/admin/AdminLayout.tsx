@@ -6,7 +6,7 @@ import {
   LogOut, 
   Menu,
   X,
-  User,mcmcmcmc,
+  User,
   Shield
 } from 'lucide-react';
 import { useAdmin } from '../../contexts/AdminContext';
