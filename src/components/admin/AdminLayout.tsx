@@ -4,7 +4,7 @@ import {
   FileText, 
   Palette, 
   LogOut, 
-  Menu,  
+  Menu,
   X,
   User,
   Shield
