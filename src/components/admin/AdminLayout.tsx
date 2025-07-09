@@ -84,7 +84,7 @@ const AdminLayout: React.FC = () => {
             ))}
           </div>
         </nav>
-                                                                 
+               
         {/* User Info */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-3 mb-3">
