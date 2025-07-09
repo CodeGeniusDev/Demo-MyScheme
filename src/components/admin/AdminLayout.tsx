@@ -62,7 +62,7 @@ const AdminLayout: React.FC = () => {
             <X className="h-5 w-5" />
           </button>
         </div>
-
+    
         <nav className="mt-6 px-3">
           <div className="space-y-1">
             {menuItems.map((item) => (
